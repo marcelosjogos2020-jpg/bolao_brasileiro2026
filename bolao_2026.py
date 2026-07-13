@@ -11,32 +11,35 @@ st.set_page_config(page_title="Da Copa - Brasileirão 2026", page_icon="⚽", la
 # ============================================================
 st.markdown("""
     <style>
-        /* Forçar Modo Claro Absoluto */
-        html, body, .stApp, .main {
+        /* Forçar Modo Claro Absoluto em todas as camadas internas do Streamlit */
+        html, body, .stApp, .main, [data-testid="stAppViewBlockContainer"] {
             background-color: #f8fafc !important;
             color: #1e293b !important;
         }
         
-        /* Esconder elementos nativos do Streamlit */
+        /* Esconder cabeçalho nativo */
         [data-testid="stHeader"] { display: none !important; }
         
         /* Cabeçalho de Saudação */
         .saudacao-title { font-size: 26px; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
         .saudacao-sub { font-size: 16px; color: #64748b; margin-bottom: 20px; }
         
-        /* Botões Rápidos da Home */
-        .action-container { display: flex; gap: 12px; margin-bottom: 25px; }
-        .action-card {
-            background-color: #f1f5f9;
-            border-radius: 16px;
-            padding: 16px;
-            flex: 1;
-            text-align: center;
-            font-weight: bold;
-            font-size: 14px;
-            color: #334155;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        /* Estilização dos Botões Reais para parecerem Cartões do App */
+        div.stButton > button {
+            background-color: #f1f5f9 !important;
+            color: #334155 !important;
+            border: none !important;
+            border-radius: 16px !important;
+            padding: 14px 10px !important;
+            font-weight: bold !important;
+            font-size: 14px !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
+            width: 100% !important;
+            transition: all 0.2s ease;
+        }
+        div.stButton > button:hover {
+            background-color: #e2e8f0 !important;
+            color: #00b25c !important;
         }
         
         /* Cartão de Grupo de Apostas */
@@ -44,7 +47,7 @@ st.markdown("""
             background-color: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 20px;
-            padding: 16px;
+            padding: 18px;
             margin-bottom: 12px;
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03);
         }
@@ -53,7 +56,7 @@ st.markdown("""
             color: #00b25c;
             font-size: 12px;
             font-weight: 800;
-            padding: 4px 8px;
+            padding: 4px 10px;
             border-radius: 8px;
             float: right;
         }
@@ -121,33 +124,46 @@ st.markdown("""
             letter-spacing: 4px;
         }
         
-        /* Estilização Customizada para as Abas de Menu */
+        /* 🚨 FORÇAR VISIBILIDADE DAS LETRAS DAS ABAS CONTRA MODO ESCURO NATIVO */
         div[data-testid="stTabs"] button {
-            font-size: 14px !important;
-            font-weight: bold !important;
-            color: #64748b !important;
+            padding: 10px 20px !important;
         }
-        div[data-testid="stTabs"] button[aria-selected="true"] {
-            color: #00b25c !important;
+        div[data-testid="stTabs"] button p {
+            font-size: 15px !important;
+            font-weight: 800 !important;
+            color: #475569 !important; /* Cor cinza escuro para abas não selecionadas */
+        }
+        div[data-testid="stTabs"] button[aria-selected="true"] p {
+            color: #00b25c !important; /* Cor verde para aba selecionada */
+        }
+        
+        /* Caixas de Texto Informativas */
+        .rule-box {
+            background-color: #ffffff;
+            border-left: 4px solid #00b25c;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #00b25c;
+            color: #334155;
         }
     </style>
 """, unsafe_allow_html=True)
 
 # ============================================================
-# SISTEMA DE DADOS COM VERIFICAÇÃO AUTOMÁTICA DE CONFLITOS
+# BANCO DE DADOS E MOTOR DE CÁLCULO
 # ============================================================
 ARQUIVO_JOGOS = "jogos_2026.csv"
 ARQUIVO_PALPITES = "palpites_2026.csv"
 
-# Força o reset se o arquivo antigo não tiver a coluna "tipo" do novo layout
+# Verifica e reinicializa se faltar a estrutura nova
 forçar_recriacao = False
 if os.path.exists(ARQUIVO_JOGOS):
     try:
         df_teste = pd.read_csv(ARQUIVO_JOGOS)
-        if "tipo" not in df_teste.columns:
-            forçar_recriacao = True
-    except:
-        forçar_recriacao = True
+        if "tipo" not in df_teste.columns: forçar_recriacao = True
+    except: forçar_recriacao = True
 
 if not os.path.exists(ARQUIVO_JOGOS) or forçar_recriacao:
     jogos_iniciais = [
@@ -165,27 +181,72 @@ if not os.path.exists(ARQUIVO_PALPITES):
 def carregar_jogos(): return pd.read_csv(ARQUIVO_JOGOS)
 def carregar_palpites(): return pd.read_csv(ARQUIVO_PALPITES)
 
-# Sistema de cálculo de pontos
 def calcular_pontos(p_home, p_away, r_home, r_away):
     if str(r_home) == "-" or str(r_away) == "-": return 0
-    ph, pa, rh, ra = int(p_home), int(p_away), int(r_home), int(r_away)
+    try:
+        ph, pa, rh, ra = int(p_home), int(p_away), int(r_home), int(r_away)
+    except:
+        return 0
     if ph == rh and pa == ra: return 10
     if ((ph - pa > 0 and rh - ra > 0) or (ph - pa < 0 and rh - ra < 0) or (ph - pa == 0 and rh - ra == 0)): return 5
     return 0
 
 # ============================================================
-# BARRA LATERAL
+# SIDEBAR - GERENCIAMENTO DE PERFIS DE AMIGOS
 # ============================================================
 with st.sidebar:
-    st.header("👤 Perfil Ativo")
-    user_ativo = st.text_input("Seu Nome no Bolão:", value="Marcelo").strip()
+    st.header("👤 Quem está jogando?")
+    df_p_init = carregar_palpites()
+    usuarios_cadastrados = list(df_p_init["usuario"].dropna().unique())
+    if "Marcelo" not in usuarios_cadastrados:
+        usuarios_cadastrados.insert(0, "Marcelo")
+    
+    op_user = st.radio("Ação Perfil:", ["Escolher Existente", "Criar Novo Amigo"])
+    if op_user == "Criar Novo Amigo":
+        novo_amigo = st.text_input("Nome do Amigo:").strip()
+        if st.button("➕ Adicionar ao Bolão") and novo_amigo:
+            if novo_amigo not in usuarios_cadastrados:
+                usuarios_cadastrados.append(novo_amigo)
+                st.success(f"{novo_amigo} adicionado!")
+                user_ativo = novo_amigo
+            else: st.warning("Nome já cadastrado.")
+    else:
+        user_ativo = st.selectbox("Selecione seu nome:", sorted(usuarios_cadastrados))
+
     username_mock = f"@{user_ativo.lower()}1000"
-    st.caption(f"Seu usuário no app: {username_mock}")
     st.divider()
     modo_admin = st.checkbox("⚙️ Ativar Modo Administrador")
 
 # ============================================================
-# NAVEGAÇÃO POR ABAS (ESTILO DA COPA)
+# CÁLCULO EM TEMPO REAL PARA O CARD DA HOME (DINÂMICO!)
+# ============================================================
+df_j_calc = carregar_jogos()
+df_p_calc = carregar_palpites()
+
+pontos_user_ativo = 0
+posicao_user_ativo = 1
+total_jogadores = len(usuarios_cadastrados)
+
+if not df_p_calc.empty:
+    lista_ranking = []
+    for u in usuarios_cadastrados:
+        pts = 0
+        p_u = df_p_calc[df_p_calc["usuario"] == u]
+        for _, palpite in p_u.iterrows():
+            j_real = df_j_calc[df_j_calc["id"] == palpite["jogo_id"]]
+            if not j_real.empty:
+                pts += calcular_pontos(palpite["palpite_home"], palpite["palpite_away"], j_real.iloc[0]["score_home"], j_real.iloc[0]["score_away"])
+        lista_ranking.append({"usuario": u, "pontos": pts})
+    
+    df_rk = pd.DataFrame(lista_ranking).sort_values(by="pontos", ascending=False).reset_index(drop=True)
+    
+    idx_voce = df_rk[df_rk["usuario"] == user_ativo].index
+    if len(idx_voce) > 0:
+        posicao_user_ativo = idx_voce[0] + 1
+        pontos_user_ativo = df_rk.loc[idx_voce[0], "pontos"]
+
+# ============================================================
+# NAVEGAÇÃO POR ABAS CORRIGIDAS
 # ============================================================
 menu_inicio, menu_classificacao, menu_partidas, menu_admin = st.tabs([
     "🏠 Início", 
@@ -199,53 +260,69 @@ with menu_inicio:
     st.markdown(f'<div class="saudacao-title">Olá, {user_ativo}!</div>', unsafe_allow_html=True)
     st.markdown('<div class="saudacao-sub">Vamos fazer uns palpites?</div>', unsafe_allow_html=True)
     
-    st.markdown("""
-        <div class="action-container">
-            <div class="action-card">➕<br>Criar Bolão</div>
-            <div class="action-card">👤<br>Entrar em Bolão</div>
-            <div class="action-card">📖<br>Regras</div>
-        </div>
-    """, unsafe_allow_html=True)
+    # Botões Reais em Colunas Funcionais
+    c_btn1, c_btn2, c_btn3 = st.columns(3)
+    clicou_criar = c_btn1.button("➕\nCriar Bolão")
+    clicou_entrar = c_btn2.button("👤\nEntrar Bolão")
+    clicou_regras = c_btn3.button("📖\nRegras")
     
+    if clicou_criar: st.info("🏆 Recurso Pro: Em breve você poderá abrir novos grupos customizados!")
+    if clicou_entrar: st.info("🔑 Digite o código convite enviado por seus amigos na barra lateral.")
+    if clicou_regras:
+        st.markdown("""
+        ### 📜 Critérios de Pontuação do Bolão
+        * **10 Pontos (Placar Exato):** Acertou o número de gols dos dois times.
+        * **5 Pontos (Tendência):** Acertou quem ganha ou se dá empate, mas errou a quantidade de gols.
+        * **0 Pontos:** Erro completo de resultado.
+        """, unsafe_allow_html=True)
+
     st.markdown("### Seus Grupos")
     st.markdown(f"""
         <div class="grupo-card">
-            <span class="badge-posicao">2º lugar</span>
+            <span class="badge-posicao">{posicao_user_ativo}º lugar</span>
             <div style="font-weight: 800; font-size: 16px; color: #0f172a;">Bolão Brasileirão 2026 - Família</div>
-            <div style="font-size: 13px; color: #64748b; margin-top: 4px;">Campeonato Brasileiro • 2 membros</div>
-            <div style="font-size: 15px; font-weight: bold; color: #00b25c; margin-top: 12px;">850 pts</div>
+            <div style="font-size: 13px; color: #64748b; margin-top: 4px;">Campeonato Brasileiro • {total_jogadores} participantes</div>
+            <div style="font-size: 15px; font-weight: bold; color: #00b25c; margin-top: 12px;">{pontos_user_ativo} pts</div>
         </div>
     """, unsafe_allow_html=True)
 
 # ----------- 2. ABA CLASSIFICAÇÃO -----------
 with menu_classificacao:
-    st.markdown("## Classificação")
+    st.markdown("## Classificação Geral")
     
-    st.markdown(f"""
-        <div class="row-ranking">
-            <div style="display:flex; align-items:center;">
-                <span style="font-weight:900; margin-right:15px; color:#64748b;">1</span>
-                <div class="player-avatar">W</div>
-                <div>
-                    <span class="player-name">Wellington Menezes</span>
-                    <span class="player-username">@wmenezes</span>
+    if df_p_calc.empty:
+        st.markdown(f"""
+            <div class="row-ranking voce">
+                <div style="display:flex; align-items:center;">
+                    <span style="font-weight:900; margin-right:15px; color:#00b25c;">1</span>
+                    <div class="player-avatar" style="background-color:#e6f4ea; color:#00b25c;">M</div>
+                    <div>
+                        <span class="player-name">{user_ativo} (Você)</span>
+                        <span class="player-username">{username_mock}</span>
+                    </div>
                 </div>
+                <div class="points-display" style="color:#00b25c;">0<span class="points-var">+0</span></div>
             </div>
-            <div class="points-display">966<span class="points-var">+24</span></div>
-        </div>
-        
-        <div class="row-ranking voce">
-            <div style="display:flex; align-items:center;">
-                <span style="font-weight:900; margin-right:15px; color:#00b25c;">2</span>
-                <div class="player-avatar" style="background-color:#e6f4ea; color:#00b25c;">M</div>
-                <div>
-                    <span class="player-name">{user_ativo} (Você)</span>
-                    <span class="player-username">{username_mock}</span>
+        """, unsafe_allow_html=True)
+    else:
+        for idx, row in df_rk.iterrows():
+            is_voce = (row["usuario"] == user_ativo)
+            classe_voce = "voce" if is_voce else ""
+            cor_txt = "#00b25c" if is_voce else "#1e293b"
+            
+            st.markdown(f"""
+                <div class="row-ranking {classe_voce}">
+                    <div style="display:flex; align-items:center;">
+                        <span style="font-weight:900; margin-right:15px; color:{cor_txt};">{idx + 1}</span>
+                        <div class="player-avatar">{row['usuario'][0].upper()}</div>
+                        <div>
+                            <span class="player-name">{row['usuario']} {"(Você)" if is_voce else ""}</span>
+                            <span class="player-username">@{row['usuario'].lower()}1000</span>
+                        </div>
+                    </div>
+                    <div class="points-display" style="color:{cor_txt};">{row['pontos']}<span class="points-var">+10</span></div>
                 </div>
-            </div>
-            <div class="points-display" style="color:#00b25c;">850<span class="points-var">+10</span></div>
-        </div>
-    """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
 # ----------- 3. ABA PARTIDAS -----------
 with menu_partidas:
@@ -254,15 +331,14 @@ with menu_partidas:
     df_jogos = carregar_jogos()
     df_palpites = carregar_palpites()
     
-    sub_filtros = st.radio("Filtros:", ["Anteriores", "Ao Vivo (0)", "Próximas"], horizontal=True, label_visibility="collapsed")
-    
+    sub_filtros = st.radio("Status:", ["Anteriores", "Ao Vivo (0)", "Próximas"], horizontal=True, label_visibility="collapsed")
     filtro_tipo = "Anterior" if sub_filtros == "Anteriores" else "Próxima"
-    jogos_filtrados = df_jogos[df_jogos["tipo"] == filtro_tipo]
     
+    jogos_filtrados = df_jogos[df_jogos["tipo"] == filtro_tipo]
     datas_unicas = jogos_filtrados["data_texto"].unique()
     
     if len(jogos_filtrados) == 0:
-        st.info(f"Nenhuma partida marcada como '{sub_filtros}' no momento.")
+        st.info(f"Nenhuma partida registrada nesta categoria.")
     
     for data_box in datas_unicas:
         st.markdown(f'<div class="date-divider">{data_box}</div>', unsafe_allow_html=True)
@@ -287,31 +363,31 @@ with menu_partidas:
                 init_h = int(p_ant.iloc[0]["palpite_home"]) if not p_ant.empty else 0
                 init_a = int(p_ant.iloc[0]["palpite_away"]) if not p_ant.empty else 0
                 
-                with st.expander(f"📝 Dar palpite para {jogo['home']} x {jogo['away']}", expanded=True):
+                with st.expander(f"📝 Preencher Palpite para: {jogo['home']} x {jogo['away']}"):
                     c_in1, c_in2, c_btn = st.columns([1, 1, 2])
                     val_h = c_in1.number_input(f"{jogo['home']}:", 0, 15, init_h, key=f"user_h_{jogo['id']}")
                     val_a = c_in2.number_input(f"{jogo['away']}:", 0, 15, init_a, key=f"user_a_{jogo['id']}")
                     
-                    if c_btn.button("Salvar Palpite", key=f"btn_salvar_{jogo['id']}", use_container_width=True):
+                    if c_btn.button("Salvar meu palpite", key=f"btn_salvar_{jogo['id']}", use_container_width=True):
                         df_palpites = df_palpites[~((df_palpites["usuario"] == user_ativo) & (df_palpites["jogo_id"] == jogo["id"]))]
                         novo_p = pd.DataFrame([{"usuario": user_ativo, "jogo_id": jogo["id"], "palpite_home": val_h, "palpite_away": val_a}])
                         df_final = pd.concat([df_palpites, novo_p], ignore_index=True)
                         df_final.to_csv(ARQUIVO_PALPITES, index=False)
-                        st.success("Palpite salvo!")
+                        st.success("Aposta registrada com sucesso!")
                         st.rerun()
 
-# ----------- 4. ABA ADMIN (LANÇAR PLACARES REAIS) -----------
+# ----------- 4. ABA ADMIN (LANÇAR RESULTADOS REAIS) -----------
 with menu_admin:
     if not modo_admin:
-        st.info("Ative a opção 'Modo Administrador' na barra lateral para lançar os encerramentos reais das partidas.")
+        st.info("Ative o 'Modo Administrador' na barra lateral esquerda para lançar as cotações e encerramentos reais.")
     else:
-        st.subheader("Lançador Oficial de Resultados")
+        st.subheader("Lançador de Placar Oficial")
         df_jogos = carregar_jogos()
         
         with st.form("painel_admin_form"):
             updates = []
             for _, jg in df_jogos.iterrows():
-                st.write(f"⚽ **{jg['home']} x {jg['away']}** ({jg['data_texto']})")
+                st.write(f"⚽ **{jg['home']} x {jg['away']}**")
                 c_h, c_a, c_status = st.columns(3)
                 
                 init_h = int(jg["score_home"]) if str(jg["score_home"]) != "-" else 0
@@ -319,7 +395,7 @@ with menu_admin:
                 
                 r_h = c_h.number_input("Gols Casa", 0, 15, init_h, key=f"adm_h_{jg['id']}")
                 r_a = c_a.number_input("Gols Fora", 0, 15, init_a, key=f"adm_a_{jg['id']}")
-                finalizado = c_status.checkbox("Encerrado", value=(str(jg["score_home"]) != "-"), key=f"adm_enc_{jg['id']}")
+                finalizado = c_status.checkbox("Partida Encerrada", value=(str(jg["score_home"]) != "-"), key=f"adm_enc_{jg['id']}")
                 
                 updates.append({
                     "id": jg["id"], "rodada": jg["rodada"], "data_texto": jg["data_texto"], "hora": jg["hora"],
@@ -329,7 +405,7 @@ with menu_admin:
                 })
                 st.divider()
                 
-            if st.form_submit_button("🔔 Publicar Placares Oficiais", use_container_width=True):
+            if st.form_submit_button("🔔 Salvar Resultados da Rodada", use_container_width=True):
                 pd.DataFrame(updates).to_csv(ARQUIVO_JOGOS, index=False)
-                st.success("Resultados oficiais publicados e consolidados com sucesso!")
+                st.success("Placar consolidado e atualizado no ranking!")
                 st.rerun()
