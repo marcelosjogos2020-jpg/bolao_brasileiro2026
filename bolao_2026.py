@@ -134,18 +134,28 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# SISTEMA DE DADOS DA RODADA DE MARÇO/JULHO DE 2026
+# SISTEMA DE DADOS COM VERIFICAÇÃO AUTOMÁTICA DE CONFLITOS
 # ============================================================
 ARQUIVO_JOGOS = "jogos_2026.csv"
 ARQUIVO_PALPITES = "palpites_2026.csv"
 
-if not os.path.exists(ARQUIVO_JOGOS):
+# Força o reset se o arquivo antigo não tiver a coluna "tipo" do novo layout
+forçar_recriacao = False
+if os.path.exists(ARQUIVO_JOGOS):
+    try:
+        df_teste = pd.read_csv(ARQUIVO_JOGOS)
+        if "tipo" not in df_teste.columns:
+            forçar_recriacao = True
+    except:
+        forçar_recriacao = True
+
+if not os.path.exists(ARQUIVO_JOGOS) or forçar_recriacao:
     jogos_iniciais = [
-        {"id": 1, "data_texto": "Terça-feira, 14 de Julho de 2026", "hora": "16:00", "tipo": "Anterior", "home": "Flamengo", "away": "Palmeiras", "score_home": "2", "score_away": "1"},
-        {"id": 2, "data_texto": "Terça-feira, 14 de Julho de 2026", "hora": "19:30", "tipo": "Anterior", "home": "São Paulo", "away": "Corinthians", "score_home": "0", "score_away": "0"},
-        {"id": 3, "data_texto": "Quarta-feira, 15 de Julho de 2026", "hora": "16:00", "tipo": "Próxima", "home": "Atlético-MG", "away": "Cruzeiro", "score_home": "-", "score_away": "-"},
-        {"id": 4, "data_texto": "Quarta-feira, 15 de Julho de 2026", "hora": "21:45", "tipo": "Próxima", "home": "Botafogo", "away": "Fluminense", "score_home": "-", "score_away": "-"},
-        {"id": 5, "data_texto": "Sábado, 18 de Julho de 2026", "hora": "18:00", "tipo": "Próxima", "home": "Internacional", "away": "Grêmio", "score_home": "-", "score_away": "-"}
+        {"id": 1, "rodada": 1, "data_texto": "Terça-feira, 14 de Julho de 2026", "hora": "16:00", "tipo": "Anterior", "home": "Flamengo", "away": "Palmeiras", "score_home": "2", "score_away": "1"},
+        {"id": 2, "rodada": 1, "data_texto": "Terça-feira, 14 de Julho de 2026", "hora": "19:30", "tipo": "Anterior", "home": "São Paulo", "away": "Corinthians", "score_home": "0", "score_away": "0"},
+        {"id": 3, "rodada": 1, "data_texto": "Quarta-feira, 15 de Julho de 2026", "hora": "16:00", "tipo": "Próxima", "home": "Atlético-MG", "away": "Cruzeiro", "score_home": "-", "score_away": "-"},
+        {"id": 4, "rodada": 1, "data_texto": "Quarta-feira, 15 de Julho de 2026", "hora": "21:45", "tipo": "Próxima", "home": "Botafogo", "away": "Fluminense", "score_home": "-", "score_away": "-"},
+        {"id": 5, "rodada": 2, "data_texto": "Sábado, 18 de Julho de 2026", "hora": "18:00", "tipo": "Próxima", "home": "Internacional", "away": "Grêmio", "score_home": "-", "score_away": "-"}
     ]
     pd.DataFrame(jogos_iniciais).to_csv(ARQUIVO_JOGOS, index=False)
 
@@ -155,7 +165,7 @@ if not os.path.exists(ARQUIVO_PALPITES):
 def carregar_jogos(): return pd.read_csv(ARQUIVO_JOGOS)
 def carregar_palpites(): return pd.read_csv(ARQUIVO_PALPITES)
 
-# Sistema de cálculo
+# Sistema de cálculo de pontos
 def calcular_pontos(p_home, p_away, r_home, r_away):
     if str(r_home) == "-" or str(r_away) == "-": return 0
     ph, pa, rh, ra = int(p_home), int(p_away), int(r_home), int(r_away)
@@ -164,7 +174,7 @@ def calcular_pontos(p_home, p_away, r_home, r_away):
     return 0
 
 # ============================================================
-# BARRA LATERAL (PERFIL FIXO MOCK)
+# BARRA LATERAL
 # ============================================================
 with st.sidebar:
     st.header("👤 Perfil Ativo")
@@ -175,7 +185,7 @@ with st.sidebar:
     modo_admin = st.checkbox("⚙️ Ativar Modo Administrador")
 
 # ============================================================
-# RENDERIZAÇÃO DAS QUATRO ABAS PRINCIPAIS (DESIGN DA COPA)
+# NAVEGAÇÃO POR ABAS (ESTILO DA COPA)
 # ============================================================
 menu_inicio, menu_classificacao, menu_partidas, menu_admin = st.tabs([
     "🏠 Início", 
@@ -189,7 +199,6 @@ with menu_inicio:
     st.markdown(f'<div class="saudacao-title">Olá, {user_ativo}!</div>', unsafe_allow_html=True)
     st.markdown('<div class="saudacao-sub">Vamos fazer uns palpites?</div>', unsafe_allow_html=True)
     
-    # Grid de Ações
     st.markdown("""
         <div class="action-container">
             <div class="action-card">➕<br>Criar Bolão</div>
@@ -212,7 +221,6 @@ with menu_inicio:
 with menu_classificacao:
     st.markdown("## Classificação")
     
-    # Renderização da tabela de amigos no estilo clássico do app
     st.markdown(f"""
         <div class="row-ranking">
             <div style="display:flex; align-items:center;">
@@ -251,8 +259,10 @@ with menu_partidas:
     filtro_tipo = "Anterior" if sub_filtros == "Anteriores" else "Próxima"
     jogos_filtrados = df_jogos[df_jogos["tipo"] == filtro_tipo]
     
-    # Agrupamento dinâmico por data idêntico ao modelo das fotos
     datas_unicas = jogos_filtrados["data_texto"].unique()
+    
+    if len(jogos_filtrados) == 0:
+        st.info(f"Nenhuma partida marcada como '{sub_filtros}' no momento.")
     
     for data_box in datas_unicas:
         st.markdown(f'<div class="date-divider">{data_box}</div>', unsafe_allow_html=True)
@@ -261,7 +271,6 @@ with menu_partidas:
         for _, jogo in jogos_do_dia.iterrows():
             placar_exibicao = f"{jogo['score_home']} : {jogo['score_away']}" if filtro_tipo == "Anterior" else "- : -"
             
-            # Layout do Card de Jogo
             st.markdown(f"""
                 <div class="match-card">
                     <div class="match-header">{jogo['hora']} · Série A</div>
@@ -273,7 +282,6 @@ with menu_partidas:
                 </div>
             """, unsafe_allow_html=True)
             
-            # Se for um jogo futuro, abre a caixinha de input discreta embaixo do card para coletar o palpite
             if filtro_tipo == "Próxima":
                 p_ant = df_palpites[(df_palpites["usuario"] == user_ativo) & (df_palpites["jogo_id"] == jogo["id"])]
                 init_h = int(p_ant.iloc[0]["palpite_home"]) if not p_ant.empty else 0
@@ -289,10 +297,10 @@ with menu_partidas:
                         novo_p = pd.DataFrame([{"usuario": user_ativo, "jogo_id": jogo["id"], "palpite_home": val_h, "palpite_away": val_a}])
                         df_final = pd.concat([df_palpites, novo_p], ignore_index=True)
                         df_final.to_csv(ARQUIVO_PALPITES, index=False)
-                        st.success("Salvo!")
+                        st.success("Palpite salvo!")
                         st.rerun()
 
-# ----------- 4. ABA ADMIN (LALÇAR PLACARES) -----------
+# ----------- 4. ABA ADMIN (LANÇAR PLACARES REAIS) -----------
 with menu_admin:
     if not modo_admin:
         st.info("Ative a opção 'Modo Administrador' na barra lateral para lançar os encerramentos reais das partidas.")
@@ -305,12 +313,16 @@ with menu_admin:
             for _, jg in df_jogos.iterrows():
                 st.write(f"⚽ **{jg['home']} x {jg['away']}** ({jg['data_texto']})")
                 c_h, c_a, c_status = st.columns(3)
-                r_h = c_h.number_input("Gols Casa", 0, 15, 0, key=f"adm_h_{jg['id']}")
-                r_a = c_a.number_input("Gols Fora", 0, 15, 0, key=f"adm_a_{jg['id']}")
+                
+                init_h = int(jg["score_home"]) if str(jg["score_home"]) != "-" else 0
+                init_a = int(jg["score_away"]) if str(jg["score_away"]) != "-" else 0
+                
+                r_h = c_h.number_input("Gols Casa", 0, 15, init_h, key=f"adm_h_{jg['id']}")
+                r_a = c_a.number_input("Gols Fora", 0, 15, init_a, key=f"adm_a_{jg['id']}")
                 finalizado = c_status.checkbox("Encerrado", value=(str(jg["score_home"]) != "-"), key=f"adm_enc_{jg['id']}")
                 
                 updates.append({
-                    "id": jg["id"], "data_texto": jg["data_texto"], "hora": jg["hora"],
+                    "id": jg["id"], "rodada": jg["rodada"], "data_texto": jg["data_texto"], "hora": jg["hora"],
                     "home": jg["home"], "away": jg["away"],
                     "tipo": "Anterior" if finalizado else "Próxima",
                     "score_home": r_h if finalizado else "-", "score_away": r_a if finalizado else "-"
@@ -319,5 +331,5 @@ with menu_admin:
                 
             if st.form_submit_button("🔔 Publicar Placares Oficiais", use_container_width=True):
                 pd.DataFrame(updates).to_csv(ARQUIVO_JOGOS, index=False)
-                st.success("Resultados publicados com sucesso!")
+                st.success("Resultados oficiais publicados e consolidados com sucesso!")
                 st.rerun()
