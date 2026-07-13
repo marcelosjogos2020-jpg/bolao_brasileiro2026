@@ -9,7 +9,7 @@ st.set_page_config(page_title="Da Copa - Brasileirão 2026", page_icon="⚽", la
 # ============================================================
 # INTERFACE DE ESTILO - RÉPLICA FIEL DO "DA COPA" (LIGHT MODE)
 # ============================================================
-# Injeta meta tag para bloquear o Google Tradutor de quebrar o app
+# Bloqueador contra o Google Tradutor nativo
 st.markdown('<meta name="google" content="notranslate" />', unsafe_allow_html=True)
 
 st.markdown("""
@@ -127,20 +127,21 @@ st.markdown("""
             letter-spacing: 4px;
         }
         
-        /* 🚨 CORREÇÃO DEFINITIVA: Força o texto das abas a ficar sempre visível e escuro */
+        /* Forçar visibilidade permanente dos títulos das abas */
         div[data-testid="stTabs"] button {
-            padding: 6px 12px !important;
+            padding: 6px 14px !important;
         }
-        div[data-testid="stTabs"] button * {
+        div[data-testid="stTabs"] button p {
             color: #334155 !important;
             font-weight: 800 !important;
             font-size: 14px !important;
+            display: block !important;
+            visibility: visible !important;
         }
-        div[data-testid="stTabs"] button[aria-selected="true"] * {
+        div[data-testid="stTabs"] button[aria-selected="true"] p {
             color: #00b25c !important;
         }
         
-        /* Caixas de Texto Informativas */
         .rule-box {
             background-color: #ffffff;
             border-left: 4px solid #00b25c;
@@ -192,11 +193,15 @@ def calcular_pontos(p_home, p_away, r_home, r_away):
     if ((ph - pa > 0 and rh - ra > 0) or (ph - pa < 0 and rh - ra < 0) or (ph - pa == 0 and rh - ra == 0)): return 5
     return 0
 
+# Memória estável do Usuário Ativo
+if "user_ativo" not in st.session_state:
+    st.session_state["user_ativo"] = "Marcelo"
+
 # ============================================================
-# SIDEBAR - CONFIGURAÇÃO DE USUÁRIOS
+# SIDEBAR - CONFIGURAÇÃO CORRIGIDA CONTRA CRASHES
 # ============================================================
 with st.sidebar:
-    st.header(" 👥 Quem está jogando?")
+    st.header("👥 Quem está jogando?")
     df_p_init = carregar_palpites()
     usuarios_cadastrados = list(df_p_init["usuario"].dropna().unique())
     if "Marcelo" not in usuarios_cadastrados:
@@ -208,12 +213,18 @@ with st.sidebar:
         if st.button("➕ Adicionar ao Bolão") and novo_amigo:
             if novo_amigo not in usuarios_cadastrados:
                 usuarios_cadastrados.append(novo_amigo)
+                st.session_state["user_ativo"] = novo_amigo
                 st.success(f"{novo_amigo} adicionado!")
-                user_ativo = novo_amigo
-            else: st.warning("Nome já cadastrado.")
+                st.rerun()
+            else:
+                st.warning("Nome já cadastrado.")
     else:
-        user_ativo = st.selectbox("Selecione seu nome:", sorted(usuarios_cadastrados))
+        current_user = st.session_state["user_ativo"]
+        idx_default = sorted(usuarios_cadastrados).index(current_user) if current_user in usuarios_cadastrados else 0
+        user_sel = st.selectbox("Selecione seu nome:", sorted(usuarios_cadastrados), index=idx_default)
+        st.session_state["user_ativo"] = user_sel
 
+    user_ativo = st.session_state["user_ativo"]
     username_mock = f"@{user_ativo.lower()}1000"
     st.divider()
     modo_admin = st.checkbox("⚙️ Ativar Modo Administrador")
@@ -247,7 +258,7 @@ if not df_p_calc.empty:
         pontos_user_ativo = df_rk.loc[idx_voce[0], "pontos"]
 
 # ============================================================
-# ABAS DE NAVEGAÇÃO INTERATIVAS
+# ABAS DE NAVEGAÇÃO
 # ============================================================
 menu_inicio, menu_classificacao, menu_partidas, menu_admin = st.tabs([
     "🏠 Início", 
@@ -261,7 +272,6 @@ with menu_inicio:
     st.markdown(f'<div class="saudacao-title">Olá, {user_ativo}!</div>', unsafe_allow_html=True)
     st.markdown('<div class="saudacao-sub">Vamos fazer uns palpites?</div>', unsafe_allow_html=True)
     
-    # Linha com botões interativos reais
     c_btn1, c_btn2, c_btn3 = st.columns(3)
     clicou_criar = c_btn1.button("➕\nCriar Bolão")
     clicou_entrar = c_btn2.button("👤\nEntrar Bolão")
