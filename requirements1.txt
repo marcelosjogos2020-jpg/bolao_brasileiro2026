@@ -1,2 +1,4 @@
-pandas
 streamlit
+pandas
+requests
+streamlit-autorefresh
